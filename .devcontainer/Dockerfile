@@ -1,15 +1,27 @@
-# The devcontainer should use the developer target and run as root with podman
-# or docker with user namespaces.
 FROM ghcr.io/diamondlightsource/ubuntu-devcontainer:noble AS developer
 
-# Add system dependencies for ansible and cluster management
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     apache2-utils \
     dnsutils \
     gh \
+    gnupg \
+    apt-transport-https \
+    ca-certificates \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# get the claude cli as its slightly more up to date than the vscode extension
-curl -fsSL https://claude.ai/install.sh | bash
+RUN install -m 0755 -d /etc/apt/keyrings \
+    && curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.35/deb/Release.key \
+    | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg \
+    && chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg \
+    && echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.35/deb/ /' \
+    > /etc/apt/sources.list.d/kubernetes.list \
+    && chmod 644 /etc/apt/sources.list.d/kubernetes.list \
+    && apt-get update -y \
+    && apt-get install -y kubectl \
+    && rm -rf /var/lib/apt/lists/*
 
-env PATH=~/.local/bin:$PATH"
+RUN curl -fsSL https://claude.ai/install.sh | bash
+RUN curl -fsSL https://opencode.ai/install | bash
+
+ENV PATH=/root/.local/bin:${PATH}
