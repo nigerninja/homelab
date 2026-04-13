@@ -10,6 +10,9 @@ tpi_images_path: /mnt/sdcard/images
 # ansible vault password file
 vault_password_file: "~/.ansible_vault_password"
 
+# RPi cluster settings
+rpi_cluster: true
+
 # location of binaries we install in the execution environment
 bin_dir: "{{ lookup('ansible.builtin.env', 'BIN_DIR', default='${HOME}/bin') }}"
 
@@ -30,11 +33,11 @@ do_flash: "{{ (flash_force | default(force_flash | default(false))) | bool }}"
 ################################################################################
 
 local_domain: .lan # how to address local nodes with dig
-control_plane: node01 # the node name of the (single) control plane
-cluster_domain: gkcluster.org # the DNS name for the cluster control plane node
-domain_email: giles.knap@gilesk.gkcluster.org # the email address for letsencrypt
+control_plane: knode1 # the node name of the (single) control plane
+cluster_domain: litaninja.dev # the DNS name for the cluster control plane node
+domain_email: litaninja@yahoo.com # the email address for letsencrypt
 # where argocd will get the cluster configuration from
-repo_remote: https://github.com/gilesknap/tpi-k3s-ansible.git
+repo_remote: https://github.com/nigerninja/homelab.git
 # Single source of truth for branch tracking. Change this and run
 # ansible-playbook pb_all.yml --tags cluster to switch branches.
 # The root app passes this down to all child apps via valuesObject.
