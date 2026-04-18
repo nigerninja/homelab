@@ -193,25 +193,40 @@ ff00::0 ip6-mcastprefix
 ff02::1 ip6-allnodes
 ff02::2 ip6-allrouters
 EOF
-    
+     
     # -------------------------------------------------------------------------
-    # Configure static IP via netplan
+    # Configure static IP via systemd-networkd
     # -------------------------------------------------------------------------
-    log "  Configuring static IP ($NODE_IP)..."
-    cat > "$MOUNT_POINT/etc/netplan/50-cloud-init.yaml" << EOF
-network:
-    version: 2
-    ethernets:
-        eth0:
-            addresses:
-                - ${NODE_IP}/24
-            gateway4: ${GATEWAY}
-            nameservers:
-                addresses:
-                    - ${DNS_SERVERS}
-            dhcp4: false
+    log "  Configuring systemd-networkd..."
+
+    mkdir -p "$MOUNT_POINT/etc/systemd/network"
+
+    cat > "$MOUNT_POINT/etc/systemd/network/10-eth0.network" << EOF
+[Match]
+Name=eth0
+
+[Network]
+Address=${NODE_IP}/24
+Gateway=${GATEWAY}
+DNS=${DNS_SERVERS}
+
+[DHCP]
+UseDNS=no
 EOF
-    chmod 600 "$MOUNT_POINT/etc/netplan/50-cloud-init.yaml"
+
+    chmod 644 "$MOUNT_POINT/etc/systemd/network/10-eth0.network"
+
+    chroot "$MOUNT_POINT" systemctl enable systemd-networkd
+
+    # -------------------------------------------------------------------------
+    # Remove cloud-init package (files remain, network config disabled)
+    # -------------------------------------------------------------------------
+    log "  Removing cloud-init package..."
+    chroot "$MOUNT_POINT" apt-get remove -y cloud-init || true
+    chroot "$MOUNT_POINT" apt-get autoremove -y || true
+
+    # Mask systemd-resolved to avoid DNS conflicts
+    chroot "$MOUNT_POINT" systemctl mask systemd-resolved
     
     # -------------------------------------------------------------------------
     # Create ansible user
@@ -235,7 +250,11 @@ EOF
     echo "$SSH_KEY" > "$MOUNT_POINT/home/${ANSIBLE_USER}/.ssh/authorized_keys"
     chroot "$MOUNT_POINT" chmod 600 "/home/${ANSIBLE_USER}/.ssh/authorized_keys"
     chroot "$MOUNT_POINT" chown -R "${ANSIBLE_USER}:${ANSIBLE_USER}" "/home/${ANSIBLE_USER}/.ssh"
-    
+
+    # Generate SSH host keys
+    log "  Generating SSH host keys..."
+    chroot "$MOUNT_POINT" ssh-keygen -A
+
     # Configure SSH server
     log "  Configuring SSH server..."
     cat > "$MOUNT_POINT/etc/ssh/sshd_config.d/ansible.conf" << EOF
@@ -277,6 +296,7 @@ EOF
     chroot "$MOUNT_POINT" apt-get update
     chroot "$MOUNT_POINT" apt-get install -y \
         curl \
+        net-tools \
         wget \
         vim \
         git \

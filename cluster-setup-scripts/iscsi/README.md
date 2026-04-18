@@ -62,7 +62,8 @@ This directory contains scripts to set up iSCSI boot for Raspberry Pi worker nod
 | `02-setup-iscsi-targets.sh` | Configure tgt (iSCSI target) to serve disk images |
 | `03-setup-tftp-server.sh` | Install and configure TFTP for PXE boot |
 | `04-configure-initramfs.sh` | Configure iSCSI initiator in initramfs for each node |
-| `05-customize-node-images.sh` | Set hostname, static IP, SSH keys, ansible user |
+| `05-customize-node-images.sh` | Set hostname, static IP via systemd-networkd, SSH keys, ansible user |
+| `05b-setup-knode1.sh` | Configure ansible user on knode1 (master node) |
 
 ## Quick Start
 
@@ -82,8 +83,12 @@ sudo ./03-setup-tftp-server.sh
 #    NOTE: This script PURGES dracut and uses initramfs-tools + iscsid
 sudo ./04-configure-initramfs.sh
 
-# 5. Customize each node (hostname, IP, SSH, ansible user)
+# 5. Customize each node (hostname, IP via systemd-networkd, SSH, ansible user)
+#    NOTE: This script REMOVES cloud-init package and uses systemd-networkd
 sudo ./05-customize-node-images.sh
+
+# 5b. Configure knode1 (master) with ansible user
+sudo ./05b-setup-knode1.sh
 ```
 
 ## Important: Why We Purge dracut and open-iscsi Scripts
@@ -112,6 +117,10 @@ Even after removing dracut, the open-iscsi package installs scripts that call `i
 | dracut | Entire package | Purged |
 | open-iscsi | `local-top/iscsi` (calls iscsistart) | Removed |
 | open-iscsi | `iscsid` and `iscsiadm` binaries | Kept |
+| cloud-init | Package (files remain) | Removed (caused network issues) |
+| netplan | Package (installed) | Not used (replaced by systemd-networkd) |
+| systemd-networkd | Package | Enabled (network configuration) |
+| systemd-resolved | Package | Masked (conflicts with static DNS) |
 | Custom script | `init-premount/iscsi` | Added (primary connection handler) |
 | Custom script | `init-bottom/iscsi-root` | Added (no-op, for debugging) |
 
@@ -136,6 +145,54 @@ The iSCSI boot uses **initramfs-tools** with a two-phase approach:
 - Retry logic: 3 attempts, 5 second delay, 15 second wait per attempt
 - CHAP credential configuration
 - Block device listing after connection
+
+## Why systemd-networkd Instead of Netplan
+
+### Problem: Cloud-init Breaking Network Configuration
+
+During testing, we discovered that cloud-init was overwriting the netplan configuration on each boot, setting `IPV4GATEWAY='0.0.0.0'` which caused the default route to disappear. This resulted in no network connectivity despite the static IP being correctly configured.
+
+The file `/run/net-eth0.conf` showed:
+```
+IPV4GATEWAY='0.0.0.0'
+IPV4ADDR='10.200.0.104'
+```
+
+Even with a properly configured netplan YAML file, cloud-init was still regenerating conflicting configs at boot time.
+
+### Solution
+
+We modified **script 05** to:
+
+1. **Remove cloud-init package** - While the files remain (for potential future use), the package is removed to prevent it from interfering with network configuration
+2. **Use systemd-networkd instead of netplan** - Direct network configuration without the netplan abstraction layer
+3. **Mask systemd-resolved** - Prevents conflicts with our static DNS configuration in `/etc/resolv.conf`
+
+### Benefits
+
+- Direct control over network configuration
+- No cloud-init interference at boot
+- Reliable static IP with gateway setting
+- Simpler stack (one network management tool instead of netplan + cloud-init)
+
+### systemd-networkd Configuration Example
+
+Each worker node gets a static network configuration file at `/etc/systemd/network/10-eth0.network`:
+
+```ini
+[Match]
+Name=eth0
+
+[Network]
+Address=10.200.0.104/24
+Gateway=10.200.0.1
+DNS=10.200.0.1
+
+[DHCP]
+UseDNS=no
+```
+
+The IP address is unique per node (102, 103, 104), while gateway and DNS remain the same.
 
 ## Configuration
 
@@ -177,9 +234,15 @@ Power on knode2, knode3, knode4. They should:
 ### 2. Verify SSH Access
 
 ```bash
-ssh -i /root/.ssh/ansible_rsa ansible@10.200.0.102
-ssh -i /root/.ssh/ansible_rsa ansible@10.200.0.103
-ssh -i /root/.ssh/ansible_rsa ansible@10.200.0.104
+# Test SSH to all cluster nodes
+ssh -i /root/.ssh/ansible_rsa ansible@10.200.0.101  # knode1 (master)
+ssh -i /root/.ssh/ansible_rsa ansible@10.200.0.102  # knode2 (worker)
+ssh -i /root/.ssh/ansible_rsa ansible@10.200.0.103  # knode3 (worker)
+ssh -i /root/.ssh/ansible_rsa ansible@10.200.0.104  # knode4 (worker)
+
+# Verify network (default route) on worker nodes
+ssh ansible@10.200.0.104 ip route show
+# Expected output: default via 10.200.0.1 dev eth0
 ```
 
 ### 3. Transfer SSH Key
@@ -343,6 +406,56 @@ tftp 10.200.0.101 -c get afa90f6a/initrd.img /tmp/test-initrd.img
 - iscsid not running: Check iscsid binary is in initramfs
 - Target not found: Verify target IQN matches in cmdline.txt and tgt config
 - Retry exhausted: Check network connectivity, IQN, CHAP credentials
+
+### Network Configuration Issues
+
+After initial setup, you may encounter these network-related issues:
+
+| Issue | Symptom | Solution |
+|-------|---------|----------|
+| **SSH host keys missing** | `sshd: no hostkeys available -- exiting` | Re-run script 05 - it now includes `ssh-keygen -A` to generate host keys during image customization |
+| **Cloud-init overriding network** | Gateway shows as `0.0.0.0` in `/run/net-eth0.conf`, no default route | Script 05 now removes cloud-init package and uses systemd-networkd instead |
+| **Default route not set** | `ip route show` shows no default gateway | Use systemd-networkd config (script 05 does this automatically) |
+
+**If you already have images and need to fix network issues**:
+
+1. Mount the image:
+```bash
+losetup -fP /srv/iscsi/knode4.img
+partprobe /dev/loop0
+mount /dev/loop0p2 /mnt
+```
+
+2. Remove cloud-init and setup systemd-networkd:
+```bash
+chroot /mnt apt-get remove -y cloud-init
+chroot /mnt apt-get autoremove -y
+mkdir -p /mnt/etc/systemd/network
+cat > /mnt/etc/systemd/network/10-eth0.network << 'EOF'
+[Match]
+Name=eth0
+[Network]
+Address=10.200.0.104/24
+Gateway=10.200.0.1
+DNS=10.200.0.1
+[DHCP]
+UseDNS=no
+EOF
+chroot /mnt systemctl enable systemd-networkd
+chroot /mnt systemctl mask systemd-resolved
+```
+
+3. Add SSH host keys:
+```bash
+chroot /mnt ssh-keygen -A
+```
+
+4. Cleanup:
+```bash
+umount /mnt
+losetup -d /dev/loop0
+```
+
 - `*.dtb` - Device tree blobs
 
 ## Cleanup
