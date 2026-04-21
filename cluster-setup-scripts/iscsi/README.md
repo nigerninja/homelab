@@ -43,6 +43,70 @@ This directory contains scripts to set up iSCSI boot for Raspberry Pi worker nod
 7. Kernel mounts root filesystem from iSCSI
 ```
 
+### RPi 4 Boot Order Setup
+Setup the boot order on the boards (using an sdcard with ubuntu pre-installed image flashed in this case) by running the bootloader configuration. Edit the EEPROM configuration with the following command:
+
+```
+sudo rpi-eeprom-config --edit
+```
+
+Replace the BOOT_ORDER line with the desired configuration, for example:
+
+```
+BOOT_ORDER=0xf241
+```
+
+===== `BOOT_ORDER` fields
+
+The `BOOT_ORDER` property defines the sequence for the different boot modes. It is read right to left, and up to eight digits may be defined.
+
+[cols="1m,1m,2"]
+|===
+| Value | Mode | Description
+
+| 0x0
+| SD CARD DETECT
+| Try SD then wait for card-detect to indicate that the card has changed. Deprecated now that `0xf` (`RESTART`) is available.
+
+| 0x1
+| SD CARD
+| SD card (or eMMC on Compute Module 4).
+
+| 0x2
+| NETWORK
+| Network boot - See xref:remote-access.adoc#network-boot-your-raspberry-pi[Network boot server tutorial].
+
+| 0x3
+| RPIBOOT
+| RPIBOOT - See https://github.com/raspberrypi/usbboot[usbboot].
+
+| 0x4
+| USB-MSD
+| USB mass storage boot - See xref:raspberry-pi.adoc#usb-mass-storage-boot[USB mass storage boot].
+
+| 0x5
+| BCM-USB-MSD
+| USB 2.0 boot from USB Type C socket (CM4: USB type A socket on CM4IO board). Not available on Raspberry Pi 5.
+
+| 0x6
+| NVME
+| CM4 and Pi 5 only: boot from an NVMe SSD connected to the PCIe interface. See xref:raspberry-pi.adoc#nvme-ssd-boot[NVMe boot] for more details.
+
+| 0x7
+| HTTP
+| HTTP boot over ethernet. See xref:raspberry-pi.adoc#http-boot[HTTP boot] for more details.
+
+| 0xe
+| STOP
+| Stop and display error pattern. A power cycle is required to exit this state.
+
+| 0xf
+| RESTART
+| Restart from the first boot-mode in the `BOOT_ORDER` field i.e. loop.
+|===
+
+
+
 **Note on Static IP**: The initramfs uses static IP (not DHCP) because the initramfs environment doesn't run a DHCP client. Each node has a pre-configured static IP in cmdline.txt.
 
 ## Prerequisites
