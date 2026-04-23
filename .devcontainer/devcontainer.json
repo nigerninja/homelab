@@ -39,7 +39,9 @@
 				"ms-kubernetes-tools.vscode-kubernetes-tools",
 				"tamasfe.even-better-toml",
 				"redhat.vscode-yaml",
-				"Anthropic.claude-code"
+				"Anthropic.claude-code",
+				"sst-dev.opencode",
+				"hashicorp.terraform"
 			]
 		}
 	},
@@ -68,7 +70,17 @@
 			"type": "volume"
 		},
 		// Mount in the .claude folder for claude user config access
-		"source=${localEnv:HOME}/.claude,target=/root/.claude,type=bind"
+		{
+			"source": "${localEnv:HOME}/.claude",
+			"target": "/root/.claude",
+			"type": "bind"
+		},
+		// Mount in the .config/opencode folder for opencode user config access
+		{
+			"source": "${localEnv:HOME}/.config/opencode",
+			"target": "/root/.config/opencode",
+			"type": "bind"
+		}
 	],
 	"remoteEnv": {
 		"ANSIBLE_VAULT_PASSWORD_FILE": "/etc/ansible/.vault_password.txt",

@@ -1,0 +1,63 @@
+---
+# pb_rpi_cluster.yml
+# Playbook for setting up RPi cluster (knode1-4) with iSCSI boot
+#
+# This playbook manages a Raspberry Pi K3s cluster where worker nodes boot
+# from iSCSI targets served by knode1.
+#
+# Usage:
+#   ansible-playbook pb_rpi_cluster.yml --tags tools
+#   ansible-playbook pb_rpi_cluster.yml --tags servers
+#   ansible-playbook pb_rpi_cluster.yml --tags k3s
+#   ansible-playbook pb_rpi_cluster.yml --tags cluster
+#
+# Or run everything at once:
+#   ansible-playbook pb_rpi_cluster.yml
+
+- name: Install client tools in execution environment
+  hosts: localhost
+  roles:
+    - role: tools
+  tags:
+    - tools
+
+- name: Verify SSH connectivity to RPi cluster
+  hosts: rpi_nodes
+  gather_facts: true
+  become: false
+  tasks:
+    - name: Verify node is reachable
+      ansible.builtin.ping:
+
+    - name: Display node information
+      ansible.builtin.debug:
+        msg: |
+          Host: {{ inventory_hostname }}
+          IP: {{ ansible_host }}
+          OS: {{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}
+          Architecture: {{ ansible_facts.architecture }}
+  tags:
+    - connectivity
+
+- name: Update and prepare RPi nodes for K3s
+  hosts: rpi_nodes
+  become: true
+  roles:
+    - role: update_packages
+  tags:
+    - servers
+
+- name: Install or update K3s control plane and workers
+  hosts: rpi_nodes
+  become: true
+  roles:
+    - role: k3s
+  tags:
+    - k3s
+
+- name: Install cluster services
+  hosts: localhost
+  roles:
+    - role: cluster
+  tags:
+    - cluster

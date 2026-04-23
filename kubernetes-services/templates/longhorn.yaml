@@ -26,7 +26,7 @@ spec:
             concurrentAutomaticEngineUpgradePerNodeLimit: 3
             snapshotMaxCount: 5
           persistence:
-            defaultClassReplicaCount: 3
+            defaultClassReplicaCount: 1
             defaultMkfsParams: "-F"
     # - path: ./kubernetes-services/additions/longhorn
     #   repoURL: {{ .Values.repo_remote }}
