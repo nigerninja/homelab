@@ -41,7 +41,7 @@ enable_oauth2_proxy: true
 # dashboard (docs/how-to/cloudflare-web-tunnel).
 # When true, disables ssl-redirect on tunnelled services so Cloudflare's
 # edge TLS termination works without redirect loops.
-enable_cloudflare_tunnel: true
+enable_cloudflare_tunnel: false
 
 # Email addresses allowed through OAuth2 proxy.
 # Each email maps to a GitHub account that can access protected services.
@@ -61,3 +61,9 @@ enable_supabase: false
 # Open Brain MCP server — standalone FastAPI service for Claude.ai MCP connector.
 # Provides thought storage and retrieval via the Supabase Postgres database.
 enable_open_brain_mcp: false
+
+enable_llamacpp: false
+
+enable_rkllama: false
+
+enable_cloudflared: false
