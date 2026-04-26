@@ -28,6 +28,12 @@ spec:
           persistence:
             defaultClassReplicaCount: 1
             defaultMkfsParams: "-F"
+          tolerations:
+            - key: node-role.kubernetes.io/master
+              operator: Exists
+              effect: NoSchedule
+          nodeSelector:
+            kubernetes.io/hostname: knode1
     # - path: ./kubernetes-services/additions/longhorn
     #   repoURL: {{ .Values.repo_remote }}
     #   targetRevision: {{ .Values.repo_branch }}
