@@ -67,3 +67,5 @@ enable_llamacpp: false
 enable_rkllama: false
 
 enable_cloudflared: false
+
+enable_longhorn: false
