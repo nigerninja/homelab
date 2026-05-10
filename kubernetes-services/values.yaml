@@ -46,7 +46,7 @@ enable_cloudflare_tunnel: false
 # Email addresses allowed through OAuth2 proxy.
 # Each email maps to a GitHub account that can access protected services.
 oauth2_emails:
-  - gilesknap@gmail.com
+  - nigerninja@yahoo.com
   - giles.knap@diamond.ac.uk
 
 # Supabase self-hosted stack for Open Brain AI memory.
