@@ -212,15 +212,15 @@ spec:
           persistence:
             db:
               enabled: true
-              storageClassName: longhorn
+              storageClassName: local-path
               size: 50Gi
             storage:
               enabled: true
-              storageClassName: longhorn
+              storageClassName: local-path
               size: 50Gi
             minio:
               enabled: true
-              storageClassName: longhorn
+              storageClassName: local-path
               size: 50Gi
 
           # -- Database migration: pgvector + thoughts schema --
