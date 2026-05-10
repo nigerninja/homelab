@@ -73,11 +73,13 @@ spec:
                   effect: NoSchedule
 
           prometheusOperator:
+            # TLS cert volume mount + admission webhooks both disabled — the webhook
+            # jobs self-delete before ArgoCD records Succeeded, permanently jamming
+            # every sync. Same fix as ingress-nginx (eaaa0f1). Neither the webhook
+            # nor internal TLS is required for CRD-reconciling operation.
+            tls:
+              enabled: false
             admissionWebhooks:
-              # Disabled: hook jobs (admission-create/patch) delete themselves before
-              # ArgoCD records Succeeded, causing every sync to get permanently stuck.
-              # Same fix as ingress-nginx (eaaa0f1). The webhook validates CRD syntax
-              # but is not required for operation.
               enabled: false
             tolerations:
               - key: workstation
