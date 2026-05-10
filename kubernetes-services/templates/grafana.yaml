@@ -33,7 +33,7 @@ spec:
             persistence:
               enabled: true
               type: sts
-              storageClassName: longhorn
+              storageClassName: local-path
               accessModes:
                 - ReadWriteOnce
               size: 30Gi
@@ -52,7 +52,7 @@ spec:
               storageSpec:
                 volumeClaimTemplate:
                   spec:
-                    storageClassName: longhorn
+                    storageClassName: local-path
                     accessModes:
                       - ReadWriteOnce
                     resources:
